@@ -46,9 +46,6 @@ class Aggregator(nn.Module):
         if mode == 'predict':
             g.update_all(dgl.function.u_mul_e('node', 'att', 'side'), lambda nodes: {'N_h': torch.sum(nodes.mailbox['side'], 1)})
         else:
-            #DGLGraph.update_all(message_func, reduce_func)
-            #dgl.function.u_mul_e(lhs_field, rhs_field, out)
-            #dgl.function.sum(msg, out)
             g.update_all(dgl.function.u_mul_e('node', 'att', 'side'), dgl.function.sum('side', 'N_h'))
 
         if self.aggregator_type == 'gcn':
@@ -71,13 +68,13 @@ class Aggregator(nn.Module):
         return out
 
 
-class KGAT(nn.Module):
+class KGAT_transd(nn.Module):
 
     def __init__(self, args,
                  n_users, n_entities, n_relations,
                  user_pre_embed=None, item_pre_embed=None):
 
-        super(KGAT, self).__init__()
+        super(KGAT_transd, self).__init__()
         self.use_pretrain = args.use_pretrain
 
         self.n_users = n_users
@@ -97,14 +94,19 @@ class KGAT(nn.Module):
 
         self.relation_embed = nn.Embedding(self.n_relations, self.relation_dim)
         self.entity_user_embed = nn.Embedding(self.n_entities + self.n_users, self.entity_dim)
+        
         if (self.use_pretrain == 1) and (user_pre_embed is not None) and (item_pre_embed is not None):
             other_entity_embed = nn.Parameter(torch.Tensor(self.n_entities - item_pre_embed.shape[0], self.entity_dim))
             nn.init.xavier_uniform_(other_entity_embed, gain=nn.init.calculate_gain('relu'))
             entity_user_embed = torch.cat([item_pre_embed, other_entity_embed, user_pre_embed], dim=0)
             self.entity_user_embed.weight = nn.Parameter(entity_user_embed)
 
-        self.W_R = nn.Parameter(torch.Tensor(self.n_relations, self.entity_dim, self.relation_dim))
-        nn.init.xavier_uniform_(self.W_R, gain=nn.init.calculate_gain('relu'))
+        #--------------------added
+        #entity and relation transfer vectors used in eq(11) + eq(12) (TransD)
+        #note: n_user + n_entities for entity_transfer_vectors dimenstion
+        self.ent_user_transfer = nn.Embedding(self.n_entities + self.n_users, self.entity_dim)
+        self.rel_transfer = nn.Parameter(torch.Tensor(self.n_relations, self.relation_dim))
+        nn.init.xavier_uniform_(self.rel_transfer, gain=nn.init.calculate_gain('relu'))
 
         self.aggregator_layers = nn.ModuleList()
         for k in range(self.n_layers):
@@ -112,11 +114,16 @@ class KGAT(nn.Module):
 
 
     def att_score(self, edges):
-        # Equation (4)
-        r_mul_t = torch.matmul(self.entity_user_embed(edges.src['id']), self.W_r)                       # (n_edge, relation_dim)
-        r_mul_h = torch.matmul(self.entity_user_embed(edges.dst['id']), self.W_r)                       # (n_edge, relation_dim)
-        r_embed = self.relation_embed(edges.data['type'])                                               # (1, relation_dim)
-        att = torch.bmm(r_mul_t.unsqueeze(1), torch.tanh(r_mul_h + r_embed).unsqueeze(2)).squeeze(-1)   # (n_edge, 1)
+        # Equation (4) modified for TransD
+        h_embed = self.entity_user_embed(edges.dst['id']) 
+        t_embed = self.entity_user_embed(edges.src['id']) 
+        h_proj = self.ent_user_transfer(edges.dst['id'])
+        t_proj = self.ent_user_transfer(edges.src['id'])  
+
+        Mrt_mul_t = F.normalize(t_embed + torch.sum(t_embed * t_proj, -1, keepdims=True) * self.r_proj, p = 2, dim = -1)     # (n_edge, relation_dim)
+        Mrh_mul_h = F.normalize(h_embed + torch.sum(h_embed * h_proj, -1, keepdims=True) * self.r_proj, p = 2, dim = -1)     # (n_edge, relation_dim)
+        r_embed = self.relation_embed(edges.data['type'])                                                                    # (1, relation_dim)
+        att = torch.bmm(Mrt_mul_t.unsqueeze(1), torch.tanh(Mrh_mul_h + r_embed).unsqueeze(2)).squeeze(-1)                    # (n_edge, 1)
         return {'att': att}
 
 
@@ -124,7 +131,8 @@ class KGAT(nn.Module):
         g = g.local_var()
         for i in range(self.n_relations):
             edge_idxs = g.filter_edges(lambda edge: edge.data['type'] == i)
-            self.W_r = self.W_R[i]
+            self.r_proj = self.rel_transfer[i]
+            #apply_edges: Update the features of the specified edges by the provided function.
             g.apply_edges(self.att_score, edge_idxs)
 
         # Equation (5)
@@ -139,26 +147,38 @@ class KGAT(nn.Module):
         pos_t:  (kg_batch_size)
         neg_t:  (kg_batch_size)
         """
-        r_embed = self.relation_embed(r)                 # (kg_batch_size, relation_dim)
-        W_r = self.W_R[r]                                # (kg_batch_size, entity_dim, relation_dim)
 
+        #projection vectors
+        h_proj = self.ent_user_transfer(h)                    # (kg_batch_size, entity_dim)
+        pos_t_proj = self.ent_user_transfer(pos_t)            # (kg_batch_size, entity_dim)
+        neg_t_proj = self.ent_user_transfer(neg_t)            # (kg_batch_size, entity_dim)
+        r_proj = self.rel_transfer[r]                         # (kg_batch_size, relation_dim)
+
+        #embedding lookup
         h_embed = self.entity_user_embed(h)              # (kg_batch_size, entity_dim)
         pos_t_embed = self.entity_user_embed(pos_t)      # (kg_batch_size, entity_dim)
         neg_t_embed = self.entity_user_embed(neg_t)      # (kg_batch_size, entity_dim)
+        r_embed = self.relation_embed(r)                 # (kg_batch_size, relation_dim)
 
-        r_mul_h = torch.bmm(h_embed.unsqueeze(1), W_r).squeeze(1)             # (kg_batch_size, relation_dim)
-        r_mul_pos_t = torch.bmm(pos_t_embed.unsqueeze(1), W_r).squeeze(1)     # (kg_batch_size, relation_dim)
-        r_mul_neg_t = torch.bmm(neg_t_embed.unsqueeze(1), W_r).squeeze(1)     # (kg_batch_size, relation_dim)
+        Mrh_mul_h = F.normalize(h_embed + torch.sum(h_embed * h_proj, -1, keepdims=True) * r_proj, p = 2, dim = -1)                  # (n_edge, relation_dim)
+        Mrt_mul_t_pos = F.normalize(pos_t_embed + torch.sum(pos_t_embed * pos_t_proj, -1, keepdims=True) * r_proj, p = 2, dim = -1)   # (n_edge, relation_dim)
+        Mrt_mul_t_neg = F.normalize(neg_t_embed + torch.sum(neg_t_embed * neg_t_proj, -1, keepdims=True) * r_proj, p = 2, dim = -1)   # (n_edge, relation_dim)
+
+        #enforce normalization constrains
+        Mrh_mul_h = F.normalize(Mrh_mul_h, 2, -1)
+        r_embed = F.normalize(r_embed, 2, -1)
+        Mrt_mul_t_pos = F.normalize(Mrt_mul_t_pos, 2, -1)
+        Mrt_mul_t_neg = F.normalize(Mrt_mul_t_neg, 2, -1)
 
         # Equation (1)
-        pos_score = torch.sum(torch.pow(r_mul_h + r_embed - r_mul_pos_t, 2), dim=1)     # (kg_batch_size)
-        neg_score = torch.sum(torch.pow(r_mul_h + r_embed - r_mul_neg_t, 2), dim=1)     # (kg_batch_size)
+        pos_score = torch.sum(torch.pow(Mrh_mul_h + r_embed - Mrt_mul_t_pos, 2), dim=1)     # (kg_batch_size)
+        neg_score = torch.sum(torch.pow(Mrh_mul_h + r_embed - Mrt_mul_t_neg, 2), dim=1)     # (kg_batch_size)
 
         # Equation (2)
         kg_loss = (-1.0) * F.logsigmoid(neg_score - pos_score)
         kg_loss = torch.mean(kg_loss)
 
-        l2_loss = _L2_loss_mean(r_mul_h) + _L2_loss_mean(r_embed) + _L2_loss_mean(r_mul_pos_t) + _L2_loss_mean(r_mul_neg_t)
+        l2_loss = _L2_loss_mean(Mrh_mul_h) + _L2_loss_mean(r_embed) + _L2_loss_mean(Mrt_mul_t_pos) + _L2_loss_mean(Mrt_mul_t_neg)
         loss = kg_loss + self.kg_l2loss_lambda * l2_loss
         return loss
 

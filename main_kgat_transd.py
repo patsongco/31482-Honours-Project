@@ -13,8 +13,8 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.distributed as dist
 
-from model.KGAT import KGAT
-from utility.parser_kgat import *
+from model.KGAT_transd import KGAT_transd
+from utility.parser_kgat_transd import *
 from utility.log_helper import *
 from utility.metrics import *
 from utility.helper import *
@@ -72,6 +72,7 @@ def train(args):
     n_gpu = torch.cuda.device_count()
     if n_gpu > 0:
         torch.cuda.manual_seed_all(args.seed)
+        print("GPU is being used -----------------------------------------")
 
     # load data
     data = DataLoaderKGAT(args, logging)
@@ -135,7 +136,6 @@ def train(args):
     # train model
     for epoch in range(1, args.n_epoch + 1):
         time0 = time()
-        #set model to 'train mode'
         model.train()
 
         # update attention scores
@@ -156,14 +156,10 @@ def train(args):
                 cf_batch_user = cf_batch_user.to(device)
                 cf_batch_pos_item = cf_batch_pos_item.to(device)
                 cf_batch_neg_item = cf_batch_neg_item.to(device)
-
-            #calc_cf_loss forward pass
             cf_batch_loss = model('calc_cf_loss', train_graph, cf_batch_user, cf_batch_pos_item, cf_batch_neg_item)
-            #backward pass
+
             cf_batch_loss.backward()
-            #update weights
             optimizer.step()
-            #zero gradients after optimization
             optimizer.zero_grad()
             cf_total_loss += cf_batch_loss.item()
 
