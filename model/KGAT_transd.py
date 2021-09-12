@@ -92,7 +92,7 @@ class KGAT_transd(nn.Module):
         self.kg_l2loss_lambda = args.kg_l2loss_lambda
         self.cf_l2loss_lambda = args.cf_l2loss_lambda
 
-        self.margin = args.margin
+        self.margin = nn.Parameter(torch.Tensor([args.margin]),requires_grad=False)
 
         self.relation_embed = nn.Embedding(self.n_relations, self.relation_dim)
         self.entity_user_embed = nn.Embedding(self.n_entities + self.n_users, self.entity_dim)
