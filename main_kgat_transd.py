@@ -94,7 +94,7 @@ def train(args):
         item_ids = item_ids.to(device)
 
     # construct model & optimizer
-    model = KGAT(args, data.n_users, data.n_entities, data.n_relations, user_pre_embed, item_pre_embed)
+    model = KGAT_transd(args, data.n_users, data.n_entities, data.n_relations, user_pre_embed, item_pre_embed)
     if args.use_pretrain == 2:
         model = load_model(model, args.pretrain_model_path)
 
@@ -252,7 +252,7 @@ def predict(args):
         item_ids = item_ids.to(device)
 
     # load model
-    model = KGAT(args, data.n_users, data.n_entities, data.n_relations)
+    model = KGAT_transd(args, data.n_users, data.n_entities, data.n_relations)
     model = load_model(model, args.pretrain_model_path)
     model.to(device)
     # if n_gpu > 1:
