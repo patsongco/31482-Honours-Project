@@ -92,6 +92,8 @@ class KGAT_transd(nn.Module):
         self.kg_l2loss_lambda = args.kg_l2loss_lambda
         self.cf_l2loss_lambda = args.cf_l2loss_lambda
 
+        self.margin = args.margin
+
         self.relation_embed = nn.Embedding(self.n_relations, self.relation_dim)
         self.entity_user_embed = nn.Embedding(self.n_entities + self.n_users, self.entity_dim)
         
@@ -175,8 +177,11 @@ class KGAT_transd(nn.Module):
         neg_score = torch.sum(torch.pow(Mrh_mul_h + r_embed - Mrt_mul_t_neg, 2), dim=1)     # (kg_batch_size)
 
         # Equation (2)
-        kg_loss = (-1.0) * F.logsigmoid(neg_score - pos_score)
-        kg_loss = torch.mean(kg_loss)
+        #modified to margin-based ranking loss used in TransD implementation Equation (15)
+        #config.margin = 1.0 => y (separating margin eq.(15))
+        kg_loss =  (torch.max(pos_score - neg_score, -self.margin)).mean() + self.margin
+        # kg_loss = (-1.0) * F.logsigmoid(neg_score - pos_score)
+        # kg_loss = torch.mean(kg_loss)
 
         l2_loss = _L2_loss_mean(Mrh_mul_h) + _L2_loss_mean(r_embed) + _L2_loss_mean(Mrt_mul_t_pos) + _L2_loss_mean(Mrt_mul_t_neg)
         loss = kg_loss + self.kg_l2loss_lambda * l2_loss

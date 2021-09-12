@@ -41,6 +41,9 @@ def parse_kgat_args():
     parser.add_argument('--mess_dropout', nargs='?', default='[0.1, 0.1, 0.1]',
                         help='Dropout probability w.r.t. message dropout for each deep layer. 0: no dropout.')
 
+    parser.add_argument('--margin', type=float, default=1.0,
+                        help='Margin separating positive and negative triplets')
+
     parser.add_argument('--kg_l2loss_lambda', type=float, default=1e-5,
                         help='Lambda when calculating KG l2 loss.')
     parser.add_argument('--cf_l2loss_lambda', type=float, default=1e-5,
