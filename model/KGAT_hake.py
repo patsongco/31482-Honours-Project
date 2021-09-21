@@ -260,6 +260,7 @@ class KGAT_hake(nn.Module):
         # negative_sample_loss = - (subsampling_weight * negative_score).sum() / subsampling_weight.sum()
 
         kg_loss = (-positive_score - negative_score) / 2
+        kg_loss = torch.mean(kg_loss)
 
         #l2 loss only applied to modulus part
         l2_loss = _L2_loss_mean(mod_head) + _L2_loss_mean(mod_relation) + _L2_loss_mean(bias_relation) + _L2_loss_mean(pos_mod_tail) + _L2_loss_mean(neg_mod_tail)
