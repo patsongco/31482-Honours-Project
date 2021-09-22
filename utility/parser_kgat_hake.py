@@ -59,9 +59,9 @@ def parse_kgat_args():
     parser.add_argument('--stopping_steps', type=int, default=10,
                         help='Number of epoch for early stopping')
 
-    parser.add_argument('--cf_print_every', type=int, default=100,
+    parser.add_argument('--cf_print_every', type=int, default=1000,
                         help='Iter interval of printing CF loss.')
-    parser.add_argument('--kg_print_every', type=int, default=100,
+    parser.add_argument('--kg_print_every', type=int, default=1000,
                         help='Iter interval of printing KG loss.')
     parser.add_argument('--evaluate_every', type=int, default=1,
                         help='Epoch interval of evaluating CF.')
