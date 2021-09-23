@@ -91,6 +91,7 @@ def recall_at_k_batch(hits, k):
     calculate Recall@k
     hits: array, element is binary (0 / 1), 2-dim
     """
+
     res = (hits[:, :k].sum(axis=1) / hits.sum(axis=1))
     return res
 
@@ -135,7 +136,9 @@ def calc_metrics_at_k(cf_scores, train_user_dict, test_user_dict, user_ids, item
     binary_hit = []
     for i in range(len(user_ids)):
         binary_hit.append(test_pos_item_binary[i][rank_indices[i]])
+    print(binary_hit)
     binary_hit = np.array(binary_hit, dtype=np.float32)
+    print(binary_hit)
 
     precision = precision_at_k_batch(binary_hit, K)
     recall = recall_at_k_batch(binary_hit, K)
