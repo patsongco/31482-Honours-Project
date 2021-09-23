@@ -91,9 +91,10 @@ def recall_at_k_batch(hits, k):
     calculate Recall@k
     hits: array, element is binary (0 / 1), 2-dim
     """
-
-    res = (hits[:, :k].sum(axis=1) / hits.sum(axis=1))
-    return res
+    if hits.sum(axis=1) == 0:
+        return hits[:, :k].sum(axis=1)
+    else: return (hits[:, :k].sum(axis=1) / hits.sum(axis=1))
+    # return res
 
 
 def F1(pre, rec):
