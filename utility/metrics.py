@@ -82,6 +82,7 @@ def recall_at_k(hit, k, all_pos_num):
     calculate Recall@k
     hit: list, element is binary (0 / 1)
     """
+
     hit = np.asfarray(hit)[:k]
     return np.sum(hit) / all_pos_num
 
@@ -91,8 +92,13 @@ def recall_at_k_batch(hits, k):
     calculate Recall@k
     hits: array, element is binary (0 / 1), 2-dim
     """
-
-    res = (hits[:, :k].sum(axis=1) / hits.sum(axis=1))
+    hits_sum = hits.sum(axis=1)
+    for i in range(hits_sum.shape[0]):
+        if hits_sum[i] == 0:
+            hits_sum[i] = 1
+        else: pass
+    
+    res = (hits[:, :k].sum(axis=1) / hits_sum)
     return res
 
 
