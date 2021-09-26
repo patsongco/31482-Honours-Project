@@ -92,6 +92,7 @@ def recall_at_k_batch(hits, k):
     calculate Recall@k
     hits: array, element is binary (0 / 1), 2-dim
     """
+    #added this due to divide by zero error
     hits_sum = hits.sum(axis=1)
     for i in range(hits_sum.shape[0]):
         if hits_sum[i] == 0:
