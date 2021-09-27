@@ -179,11 +179,11 @@ class KGAT_transd(nn.Module):
         # Equation (2)
         #modified to margin-based ranking loss used in TransD implementation Equation (15)
         #config.margin = 1.0 => y (separating margin eq.(15))
-        kg_loss =  (torch.max(pos_score - neg_score, -self.margin)).mean() + self.margin
+        # kg_loss =  (torch.max(pos_score - neg_score, -self.margin)).mean() + self.margin
 
         #pairwise ranking loss
-        # kg_loss = (-1.0) * F.logsigmoid(neg_score - pos_score)
-        # kg_loss = torch.mean(kg_loss)
+        kg_loss = (-1.0) * F.logsigmoid(neg_score - pos_score)
+        kg_loss = torch.mean(kg_loss)
 
         l2_loss = _L2_loss_mean(Mrh_mul_h) + _L2_loss_mean(r_embed) + _L2_loss_mean(Mrt_mul_t_pos) + _L2_loss_mean(Mrt_mul_t_neg)
         loss = kg_loss + self.kg_l2loss_lambda * l2_loss
