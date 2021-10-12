@@ -95,17 +95,35 @@ class KGAT(nn.Module):
         self.kg_l2loss_lambda = args.kg_l2loss_lambda
         self.cf_l2loss_lambda = args.cf_l2loss_lambda
 
-        self.relation_embed = nn.Embedding(self.n_relations, self.relation_dim)
-        nn.init.xavier_uniform_(self.relation_embed, gain=nn.init.calculate_gain('relu'))
-        self.entity_user_embed = nn.Embedding(self.n_entities + self.n_users, self.entity_dim)
-        nn.init.xavier_uniform_(self.entity_user_embed, gain=nn.init.calculate_gain('relu'))
+        self.epsilon = 2.0
+
+        self.gamma = nn.Parameter(
+            torch.Tensor([args.gamma]),
+            requires_grad=False
+        )
+
+        self.embedding_range = nn.Parameter(
+            torch.Tensor([(self.gamma.item() + self.epsilon) / self.entity_dim]),
+            requires_grad=False
+        )
+
+        self.relation_embed = nn.Embedding(self.n_relations, self.relation_dim*2)
+        nn.init.uniform_(
+            tensor=self.relation_embed,
+            a=-self.embedding_range.item(),
+            b=self.embedding_range.item()
+        )
+
+        self.entity_user_embed = nn.Embedding(self.n_entities + self.n_users, self.entity_dim*2)
+        self.entity_user_embed.weight.data.uniform_(-self.embedding_range.item(), self.embedding_range.item())
+
         if (self.use_pretrain == 1) and (user_pre_embed is not None) and (item_pre_embed is not None):
             other_entity_embed = nn.Parameter(torch.Tensor(self.n_entities - item_pre_embed.shape[0], self.entity_dim))
             nn.init.xavier_uniform_(other_entity_embed, gain=nn.init.calculate_gain('relu'))
             entity_user_embed = torch.cat([item_pre_embed, other_entity_embed, user_pre_embed], dim=0)
             self.entity_user_embed.weight = nn.Parameter(entity_user_embed)
 
-        self.W_R = nn.Parameter(torch.Tensor(self.n_relations, self.entity_dim, self.relation_dim))
+        self.W_R = nn.Parameter(torch.Tensor(self.n_relations, self.entity_dim, self.relation_dim*2))
         nn.init.xavier_uniform_(self.W_R, gain=nn.init.calculate_gain('relu'))
 
         self.aggregator_layers = nn.ModuleList()

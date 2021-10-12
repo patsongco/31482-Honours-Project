@@ -119,12 +119,7 @@ class KGAT_crosse(nn.Module):
 
 
     def att_score(self, edges):
-        # Equation (4)
-        r_mul_t = torch.matmul(self.entity_user_embed(edges.src['id']), self.W_r)                       # (n_edge, relation_dim)
-        r_mul_h = torch.matmul(self.entity_user_embed(edges.dst['id']), self.W_r)                       # (n_edge, relation_dim)
-        r_embed = self.relation_embed(edges.data['type'])                                               # (1, relation_dim)
-
-
+        
         h_embed = self.entity_user_embed(edges.dst['id']).unsqueeze(1)                              #(n_edge, 1, entity_dim * 2)
         t_embed = self.entity_user_embed(edges.src['id']).unsqueeze(1)                              #(n_edge, 1, entity_dim * 2)
         r_embed = torch.index_select(                                                               #(n_edge, 1, entity_dim * 3)
@@ -139,7 +134,10 @@ class KGAT_crosse(nn.Module):
         #interaction embedding for entities eq(2) => c_r * h_e
         #interaction embedding for relations eq(4) => c_r * h_e * r_e
         #combination operator calculation eq(5) (CrossE)
-        q_h_r = torch.tanh(h_embed * c_r + h_e * c_r *r_e + b)
+        q_h_r = torch.tanh(h_embed * c_r + h_embed * c_r *r_embed + b)
+
+        #similarity operator calculation eq(6)
+        att = torch.sum(torch.sigmoid(torch.matmul(q_h_r, t_embed.t())),dim=1)
 
         att = torch.bmm(r_mul_t.unsqueeze(1), torch.tanh(r_mul_h + r_embed).unsqueeze(2)).squeeze(-1)   # (n_edge, 1)
         return {'att': att}
