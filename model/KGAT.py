@@ -95,8 +95,8 @@ class KGAT(nn.Module):
         self.kg_l2loss_lambda = args.kg_l2loss_lambda
         self.cf_l2loss_lambda = args.cf_l2loss_lambda
 
-        self.relation_embed = nn.Embedding(self.n_relations, self.relation_dim*2)
-        self.entity_user_embed = nn.Embedding(self.n_entities + self.n_users, self.entity_dim*2)
+        self.relation_embed = nn.Embedding(self.n_relations, self.relation_dim)
+        self.entity_user_embed = nn.Embedding(self.n_entities + self.n_users, self.entity_dim)
         if (self.use_pretrain == 1) and (user_pre_embed is not None) and (item_pre_embed is not None):
             other_entity_embed = nn.Parameter(torch.Tensor(self.n_entities - item_pre_embed.shape[0], self.entity_dim))
             nn.init.xavier_uniform_(other_entity_embed, gain=nn.init.calculate_gain('relu'))
