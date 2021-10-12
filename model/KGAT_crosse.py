@@ -96,15 +96,22 @@ class KGAT_crosse(nn.Module):
         self.cf_l2loss_lambda = args.cf_l2loss_lambda
 
         self.relation_embed = nn.Embedding(self.n_relations, self.relation_dim)
+        nn.init.xavier_uniform_(self.relation_embed, gain=nn.init.calculate_gain('relu'))
         self.entity_user_embed = nn.Embedding(self.n_entities + self.n_users, self.entity_dim)
+        nn.init.xavier_uniform_(self.entity_user_embed, gain=nn.init.calculate_gain('relu'))
         if (self.use_pretrain == 1) and (user_pre_embed is not None) and (item_pre_embed is not None):
             other_entity_embed = nn.Parameter(torch.Tensor(self.n_entities - item_pre_embed.shape[0], self.entity_dim))
             nn.init.xavier_uniform_(other_entity_embed, gain=nn.init.calculate_gain('relu'))
             entity_user_embed = torch.cat([item_pre_embed, other_entity_embed, user_pre_embed], dim=0)
             self.entity_user_embed.weight = nn.Parameter(entity_user_embed)
 
-        self.W_R = nn.Parameter(torch.Tensor(self.n_relations, self.entity_dim, self.relation_dim))
-        nn.init.xavier_uniform_(self.W_R, gain=nn.init.calculate_gain('relu'))
+        #--------------------added
+        #interaction and combination bias vectors used in eq(3) + eq(5) (CrossE)
+        #note: n_user + n_entities for entity_transfer_vectors dimension
+        self.interaction_matrix = nn.Embedding(self.n_relations, self.relation_dim)
+        nn.init.xavier_uniform_(self.interaction_matrix, gain=nn.init.calculate_gain('relu'))
+        self.combination_bias_vector = nn.Embedding(self.relation_dim)
+        nn.init.xavier_uniform_(self.combination_bias_vector, gain=nn.init.calculate_gain('relu'))
 
         self.aggregator_layers = nn.ModuleList()
         for k in range(self.n_layers):
@@ -116,8 +123,52 @@ class KGAT_crosse(nn.Module):
         r_mul_t = torch.matmul(self.entity_user_embed(edges.src['id']), self.W_r)                       # (n_edge, relation_dim)
         r_mul_h = torch.matmul(self.entity_user_embed(edges.dst['id']), self.W_r)                       # (n_edge, relation_dim)
         r_embed = self.relation_embed(edges.data['type'])                                               # (1, relation_dim)
+
+
+        h_embed = self.entity_user_embed(edges.dst['id']).unsqueeze(1)                              #(n_edge, 1, entity_dim * 2)
+        t_embed = self.entity_user_embed(edges.src['id']).unsqueeze(1)                              #(n_edge, 1, entity_dim * 2)
+        r_embed = torch.index_select(                                                               #(n_edge, 1, entity_dim * 3)
+            self.relation_embedding,
+            dim=0,
+            index=edges.data['type']
+        ).unsqueeze(1)
+
+        c_r = self.interaction_matrix(edges.data['type'])
+        b = self.combination_bias_vector
+
+        #interaction embedding for entities eq(2) => c_r * h_e
+        #interaction embedding for relations eq(4) => c_r * h_e * r_e
+        #combination operator calculation eq(5) (CrossE)
+        q_h_r = torch.tanh(h_embed * c_r + h_e * c_r *r_e + b)
+
         att = torch.bmm(r_mul_t.unsqueeze(1), torch.tanh(r_mul_h + r_embed).unsqueeze(2)).squeeze(-1)   # (n_edge, 1)
         return {'att': att}
+
+        
+
+
+        # embeddings = tf.concat([self.weights['user_embed'], self.weights['entity_embed']], axis=0)
+
+        # h_e = tf.nn.embedding_lookup(embeddings, h)
+        # t_e = tf.nn.embedding_lookup(embeddings, t)
+
+        # # relation embeddings: batch_size * kge_dim
+        # r_e = tf.nn.embedding_lookup(self.weights['relation_embed'], r)
+
+        # #--------------------added
+        # c_r = tf.nn.embedding_lookup(self.weights['interaction_matrix'], r)
+        # b = self.weights['combination_bias_vector']
+
+        # #interaction embedding for entities eq(2) => c_r * h_e
+        # #interaction embedding for relations eq(4) => c_r * h_e * r_e
+        # #combination operator calculation eq(5) (CrossE)
+        # q_h_r = tf.tanh(h_e * c_r + h_e * c_r *r_e + b)
+
+        # #--------------------added
+        # #similarity operator calculation eq(6)
+        # kg_score = tf.reduce_sum(tf.sigmoid(tf.matmul(q_h_r, t_e, transpose_b=True)),1)
+
+
 
 
     def compute_attention(self, g):
