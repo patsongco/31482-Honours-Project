@@ -33,6 +33,9 @@ def parse_kgat_args():
                         help='User / entity Embedding size.')
     parser.add_argument('--relation_dim', type=int, default=64,
                         help='Relation Embedding size.')
+                        #added
+    parser.add_argument('--gamma', type=float, default=12.0, 
+                        help='Fixed margin.')
 
     parser.add_argument('--aggregation_type', nargs='?', default='bi-interaction',
                         help='Specify the type of the aggregation layer from {gcn, graphsage, bi-interaction}.')
