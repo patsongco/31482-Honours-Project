@@ -107,7 +107,7 @@ class KGAT(nn.Module):
             requires_grad=False
         )
 
-        self.relation_embed = nn.Embedding(self.n_relations, self.relation_dim*2)
+        self.relation_embed = nn.Parameter(self.n_relations, self.relation_dim*2)
         nn.init.uniform_(
             tensor=self.relation_embed,
             a=-self.embedding_range.item(),
