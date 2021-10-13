@@ -191,10 +191,10 @@ class KGAT_rotatE(nn.Module):
         """
 
         # Equation (4) modified to refelect RotatE distance score function
-        h_embed = self.entity_user_embed(h)                      #(kg_batch_size, 1, entity_dim * 2)
-        pos_t_embed = self.entity_user_embed(pos_t)                        #(kg_batch_size, 1, entity_dim * 2)                    
-        neg_t_embed = self.entity_user_embed(neg_t)             #(kg_batch_size, 1, entity_dim * 2)
-        r_embed = self.relation_embedding(r)                    #(kg_batch_size, 1, relation_dim)
+        h_embed = self.entity_user_embed(h).unsqueeze(1)                      #(kg_batch_size, 1, entity_dim * 2)
+        pos_t_embed = self.entity_user_embed(pos_t).unsqueeze(1)                         #(kg_batch_size, 1, entity_dim * 2)                    
+        neg_t_embed = self.entity_user_embed(neg_t).unsqueeze(1)              #(kg_batch_size, 1, entity_dim * 2)
+        r_embed = self.relation_embedding(r).unsqueeze(1)                     #(kg_batch_size, 1, relation_dim)
 
         #split ent embeddings into real/imaginary parts
         re_head, im_head = torch.chunk(h_embed, 2, dim=-1)                                    #(kg_batch_size, 1, entity_dim)
