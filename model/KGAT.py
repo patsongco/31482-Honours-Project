@@ -103,7 +103,7 @@ class KGAT(nn.Module):
             entity_user_embed = torch.cat([item_pre_embed, other_entity_embed, user_pre_embed], dim=0)
             self.entity_user_embed.weight = nn.Parameter(entity_user_embed)
 
-        self.W_R = nn.Parameter(torch.Tensor(self.n_relations, self.entity_dim*2, self.relation_dim*2))
+        self.W_R = nn.Parameter(torch.Tensor(self.n_relations, self.entity_dim, self.relation_dim))
         nn.init.xavier_uniform_(self.W_R, gain=nn.init.calculate_gain('relu'))
 
         self.aggregator_layers = nn.ModuleList()
