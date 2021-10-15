@@ -164,7 +164,7 @@ class KGAT(nn.Module):
         positive_score = F.logsigmoid(pos_score).squeeze(dim=1)
         
         kg_loss = (-positive_score - negative_score) / 2
-        loss = torch.mean(kg_loss)
+        kg_loss = torch.mean(kg_loss)
 
         l2_loss = _L2_loss_mean(r_mul_h) + _L2_loss_mean(r_embed) + _L2_loss_mean(r_mul_pos_t) + _L2_loss_mean(r_mul_neg_t)
         loss = kg_loss + self.kg_l2loss_lambda * l2_loss
